@@ -1,12 +1,14 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
-// ใช้ require เพื่อดึงไฟล์ต่าง ๆ
-const items = require('./items');  // กลับขึ้นไปที่โฟลเดอร์หลัก
-const { showShop, handlePurchase } = require('./Commands/shopCommands.js'); // ใช้เส้นทางสัมพัทธ์
+const items = require('./items');  // Assuming items.js is in the same directory
+const { showShop, handlePurchase } = require('./Commands/shopCommands.js');
 const config = require('./config');
+const fs = require('fs');
 
+// Path to the user balances file
+const userBalancesFile = './userBalances.json';
 
-// สร้างบอท
+// Initialize the bot client
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -15,25 +17,62 @@ const client = new Client({
     ]
 });
 
-// เก็บข้อมูลเงินของผู้ใช้
-const userBalance = {};
+// Store user balances, will load from file on bot startup
+let userBalances = {};
 
+// Function to load user balances from file
+function loadUserBalances() {
+    if (fs.existsSync(userBalancesFile)) {
+        try {
+            const data = fs.readFileSync(userBalancesFile);
+            userBalances = JSON.parse(data);
+        } catch (error) {
+            console.error('Error loading user balances:', error);
+        }
+    }
+}
+
+// Function to save user balances to file
+function saveUserBalances() {
+    try {
+        fs.writeFileSync(userBalancesFile, JSON.stringify(userBalances, null, 2));
+    } catch (error) {
+        console.error('Error saving user balances:', error);
+    }
+}
+
+// Event: Bot is ready
 client.once('ready', () => {
-    console.log('บอทออนไลน์แล้ว!');
+    console.log('Bot is online!');
+    loadUserBalances();  // Load balances when the bot starts
 });
 
-// คำสั่งดูรายการสินค้าที่สามารถซื้อได้
+// Command to show the shop
 client.on('messageCreate', (message) => {
     if (message.content === '!shop') {
-        showShop(message);  // เรียกใช้ฟังก์ชัน showShop จาก shopCommands.js
+        showShop(message);
     }
 });
 
-// คำสั่งซื้อสินค้าเมื่อผู้ใช้เลือกจากเมนู
+// Command to handle interactions (purchase items)
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isSelectMenu()) return;
 
-    await handlePurchase(interaction, userBalance);  // เรียกใช้ฟังก์ชัน handlePurchase
+    try {
+        await handlePurchase(interaction, userBalances);
+    } catch (error) {
+        console.error('Error handling purchase:', error);
+        await interaction.reply({
+            content: '❌ Something went wrong with the purchase. Please try again later.',
+            ephemeral: true
+        });
+    }
 });
 
-client.login(config.BOT_TOKEN);
+// Save balances before the bot shuts down
+process.on('exit', saveUserBalances);
+
+// Bot login
+client.login(config.BOT_TOKEN).catch(error => {
+    console.error('Failed to log in:', error);
+});
