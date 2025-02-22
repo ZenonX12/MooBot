@@ -26,7 +26,7 @@ To set up and run the bot locally, follow these steps:
    ```
    bash
    git clone https://github.com/ZenonX12/MooBot.git
-   cd discord-bot-shop
+   cd MooBot
    ```
 
 2. Install dependencies:
