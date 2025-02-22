@@ -60,7 +60,14 @@ async function handlePurchase(interaction) {
 
     // ดึงยอดเงินจากฐานข้อมูล
     const user = await User.findOne({ userId: interaction.user.id });
-    const userCoins = user ? user.balance : 0;
+    if (!user) {
+        await interaction.reply({
+            content: `❌ ไม่พบข้อมูลผู้ใช้ในระบบ.`,
+            ephemeral: true
+        });
+        return;
+    }
+    const userCoins = user.balance;
 
     // ถ้าเงินไม่พอ
     if (userCoins < item.price) {
@@ -110,6 +117,15 @@ async function handlePurchase(interaction) {
             // คำนวณราคาใหม่หลังจากส่วนลด
             const quantity = parseInt(interaction.values[1] || '1');
             const finalPrice = applyDiscount(item, quantity);
+
+            // ตรวจสอบว่าเหรียญที่ผู้ใช้มีเพียงพอหรือไม่
+            if (userCoins < finalPrice) {
+                await interaction.reply({
+                    content: `❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ **${item.name}** จำนวน ${quantity} ชิ้น.`,
+                    ephemeral: true
+                });
+                return;
+            }
 
             // ลดเหรียญจากผู้ใช้
             user.balance -= finalPrice;
@@ -166,6 +182,11 @@ async function handleReview(interaction, item) {
 // ฟังก์ชันส่งของขวัญ
 async function sendGift(interaction, recipientId, item) {
     const user = await User.findOne({ userId: interaction.user.id });
+    if (!user) {
+        await interaction.reply('ไม่พบข้อมูลผู้ใช้ในระบบ');
+        return;
+    }
+
     if (user.balance < item.price) {
         await interaction.reply('คุณไม่มีเหรียญเพียงพอสำหรับการซื้อของขวัญ');
         return;

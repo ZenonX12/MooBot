@@ -48,19 +48,23 @@ client.once('ready', () => {
     loadUserBalances();  // Load balances when the bot starts
 });
 
-// Command to show the shop
+// Command to show the shop and fight commands separately
 client.on('messageCreate', (message) => {
+    if (message.author.bot) return; // Prevent bot from responding to its own messages
+
+    // Check for !shop command first
     if (message.content === '!shop') {
         showShop(message);
+        return;  // Ensure that the rest of the code doesn't execute after handling the shop command
     }
 
+    // Check for !fight command
     if (message.content === '!fight') {
         const userId = message.author.id;
         const userBalance = userBalances[userId] || 0;  // Get the user's balance
         fightCommand.execute(message, userBalance);  // Pass userBalance correctly
     }
 });
-
 
 // Command to handle interactions (purchase items)
 client.on('interactionCreate', async (interaction) => {
@@ -78,7 +82,10 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Save balances before the bot shuts down
-process.on('exit', saveUserBalances);
+process.on('SIGINT', () => {
+    saveUserBalances();
+    process.exit();
+});
 
 // Bot login
 client.login(config.BOT_TOKEN).catch(error => {
