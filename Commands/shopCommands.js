@@ -1,4 +1,3 @@
-// shopCommands.js
 const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const items = require('../items');  // กลับขึ้นไปที่โฟลเดอร์หลัก
 
@@ -25,7 +24,7 @@ function showShop(message) {
         .addFields(
             items.map(item => ({
                 name: `**${item.name}** - ${item.price} เหรียญ`,
-                value: `*${item.description}*`,
+                value: `*${item.description}*`, // ให้รายละเอียด
                 inline: true
             }))
         )
@@ -44,6 +43,15 @@ async function handlePurchase(interaction, userBalance) {
     const itemId = interaction.values[0];
     const item = items.find(i => i.id === itemId);
     const userCoins = userBalance[interaction.user.id] || 0;
+
+    // ถ้าเงินไม่พอ
+    if (userCoins < item.price) {
+        await interaction.reply({
+            content: `❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ **${item.name}**.`,
+            ephemeral: true
+        });
+        return;
+    }
 
     const embed = new EmbedBuilder()
         .setColor('#28a745')
@@ -68,12 +76,9 @@ async function handlePurchase(interaction, userBalance) {
 
     collector.on('collect', async (response) => {
         if (response.content.toLowerCase() === 'yes') {
-            if (userCoins >= item.price) {
-                userBalance[interaction.user.id] = userCoins - item.price;
-                await response.reply(`🎉 คุณได้ซื้อ **${item.name}** ในราคา ${item.price} เหรียญ! คุณมีเหรียญเหลือ ${userBalance[interaction.user.id]} เหรียญ.`);
-            } else {
-                await response.reply(`❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ **${item.name}**.`);
-            }
+            // ซื้อสำเร็จ
+            userBalance[interaction.user.id] = userCoins - item.price;
+            await response.reply(`🎉 คุณได้ซื้อ **${item.name}** ในราคา ${item.price} เหรียญ! คุณมีเหรียญเหลือ ${userBalance[interaction.user.id]} เหรียญ.`);
         } else if (response.content.toLowerCase() === 'no') {
             await response.reply(`🚫 การซื้อ **${item.name}** ถูกยกเลิก.`);
         }
