@@ -1,4 +1,4 @@
-```markdown
+```
 # Discord Bot Shop
 
 🎉 **Welcome to the Discord Bot Shop!** 🎉
@@ -25,7 +25,7 @@ To set up and run the bot locally, follow these steps:
 
    ```
    bash
-   git clone https://github.com/yourusername/discord-bot-shop.git
+   git clone https://github.com/ZenonX12/MooBot.git
    cd discord-bot-shop
    ```
 
