@@ -23,7 +23,8 @@ To set up and run the bot locally, follow these steps:
 
 1. Clone the repository:
 
-   ```bash
+   ```
+   bash
    git clone https://github.com/yourusername/discord-bot-shop.git
    cd discord-bot-shop
    ```
