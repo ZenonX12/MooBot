@@ -1,5 +1,29 @@
-module.exports = [
-    { name: 'น้ำยาฟื้นฟู', price: 50, id: 'potion', description: 'ใช้ฟื้นฟูพลังชีวิต', image: 'https://example.com/potion.png' },
-    { name: 'ดาบ', price: 100, id: 'sword', description: 'ดาบที่ใช้ในการโจมตี', image: 'https://example.com/sword.png' },
-    { name: 'โล่', price: 150, id: 'shield', description: 'ใช้ป้องกันการโจมตี', image: 'https://example.com/shield.png' }
+// itmes ที่ใช้ขายของ !!!
+const items = [
+    {
+        id: '1',
+        name: 'อาวุธไม้',
+        price: 100,
+        category: 'weapons',
+        image: 'https://example.com/item1.jpg',
+        reviews: [],
+    },
+    {
+        id: '2',
+        name: 'โล่ทอง',
+        price: 200,
+        category: 'accessories',
+        image: 'https://example.com/item2.jpg',
+        reviews: [],
+    },
+    {
+        id: '3',
+        name: 'แหวนเพชร',
+        price: 500,
+        category: 'jewelry',
+        image: 'https://example.com/item3.jpg',
+        reviews: [],
+    },
 ];
+
+module.exports = items;
