@@ -62,7 +62,17 @@ client.on('messageCreate', (message) => {
     if (message.content === '!fight') {
         const userId = message.author.id;
         const userBalance = userBalances[userId] || 0;  // Get the user's balance
-        fightCommand.execute(message, userBalance);  // Pass userBalance correctly
+        fightCommand.execute(message, userBalance)  // Pass userBalance correctly
+            .then((updatedBalance) => {
+                // Save updated balance if necessary
+                if (updatedBalance !== userBalance) {
+                    userBalances[userId] = updatedBalance;
+                    saveUserBalances();
+                }
+            })
+            .catch((error) => {
+                console.error('Error during fight:', error);
+            });
     }
 });
 
@@ -72,6 +82,12 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
         await handlePurchase(interaction, userBalances);
+
+        // After handling purchase, update the balance
+        const userId = interaction.user.id;
+        const newBalance = userBalances[userId] || 0;
+        userBalances[userId] = newBalance;  // Ensure that the balance is updated after purchase
+        saveUserBalances();  // Save balances after any transaction
     } catch (error) {
         console.error('Error handling purchase:', error);
         await interaction.reply({

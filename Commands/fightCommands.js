@@ -80,7 +80,7 @@ module.exports = {
             // คำนวณการโจมตี
             let userCoins = userBalance[userId] || 0;
             let userAttack = Math.floor(Math.random() * 40) + 35 + attackBonus;
-            let monsterAttack = Math.floor(Math.random() * selectedMonster.attack) + (selectedMonster.attack / 3);
+            let monsterAttack = Math.max(Math.floor(Math.random() * selectedMonster.attack) + (selectedMonster.attack / 3), 0);
 
             // เพิ่มโอกาสโจมตีคริติคอล
             if (Math.random() < 0.20) {

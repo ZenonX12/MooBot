@@ -1,6 +1,6 @@
 const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const items = require('../items'); // กลับขึ้นไปที่โฟลเดอร์หลัก
-const User = require('../models/User');  // การเรียกใช้โมเดลผู้ใช้จาก MongoDB
+const items = require('../items');
+const User = require('../models/User');
 
 // ฟังก์ชันคำนวณราคาสินค้าหลังจากส่วนลด
 function applyDiscount(item, quantity) {
@@ -46,14 +46,14 @@ function filterItemsByCategory(category) {
 // ฟังก์ชันจัดการการซื้อสินค้าของผู้ใช้
 async function handlePurchase(interaction) {
     const itemId = interaction.values[0];  // เปลี่ยนจาก values[1] เป็น values[0]
-    console.log("Item ID selected:", itemId);  // ตรวจสอบค่า itemId
-    console.log("Available items:", items);   // ตรวจสอบรายการสินค้า    
+    console.log("Item ID selected:", itemId);
+    console.log("Available items:", items);
 
-    const item = items.find(i => i.id === itemId);  // หา item ที่ตรงกับ ID
+    const item = items.find(i => i.id === itemId);
     if (!item) {
         await interaction.reply({
             content: `❌ ไม่พบสินค้าในระบบ.`,
-            ephemeral: true
+            flags: 64  // ใช้ flags แทน ephemeral
         });
         return;
     }
@@ -63,7 +63,7 @@ async function handlePurchase(interaction) {
     if (!user) {
         await interaction.reply({
             content: `❌ ไม่พบข้อมูลผู้ใช้ในระบบ.`,
-            ephemeral: true
+            flags: 64
         });
         return;
     }
@@ -73,7 +73,7 @@ async function handlePurchase(interaction) {
     if (userCoins < item.price) {
         await interaction.reply({
             content: `❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ **${item.name}**. ลองทำภารกิจเพื่อหาเหรียญเพิ่มเติม!`,
-            ephemeral: true  // ใช้ ephemeral แทน flags
+            flags: 64
         });
         return;
     }
@@ -106,7 +106,7 @@ async function handlePurchase(interaction) {
     await interaction.reply({
         content: 'กรุณายืนยันการซื้อสินค้าด้านล่าง',
         embeds: [embed],
-        ephemeral: true  // ใช้ ephemeral แทน flags
+        flags: 64  // ใช้ flags แทน ephemeral
     });
 
     const filter = (response) => response.user.id === interaction.user.id && ['yes', 'no'].includes(response.content.toLowerCase());
@@ -114,20 +114,17 @@ async function handlePurchase(interaction) {
 
     collector.on('collect', async (response) => {
         if (response.content.toLowerCase() === 'yes') {
-            // คำนวณราคาใหม่หลังจากส่วนลด
             const quantity = parseInt(interaction.values[1] || '1');
             const finalPrice = applyDiscount(item, quantity);
 
-            // ตรวจสอบว่าเหรียญที่ผู้ใช้มีเพียงพอหรือไม่
             if (userCoins < finalPrice) {
                 await interaction.reply({
                     content: `❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ **${item.name}** จำนวน ${quantity} ชิ้น.`,
-                    ephemeral: true
+                    flags: 64
                 });
                 return;
             }
 
-            // ลดเหรียญจากผู้ใช้
             user.balance -= finalPrice;
             await user.save();
 
@@ -140,7 +137,7 @@ async function handlePurchase(interaction) {
 
     collector.on('end', (collected, reason) => {
         if (reason === 'time') {
-            interaction.followUp({ content: 'หมดเวลาในการตอบกลับ', ephemeral: true });
+            interaction.followUp({ content: 'หมดเวลาในการตอบกลับ', flags: 64 });
         }
     });
 }
@@ -149,7 +146,7 @@ async function handlePurchase(interaction) {
 async function handleReview(interaction, item) {
     const userReview = item.reviews.find(review => review.user === interaction.user.id);
     if (userReview) {
-        await interaction.reply({ content: 'คุณได้รีวิวสินค้านี้ไปแล้ว!', ephemeral: true });
+        await interaction.reply({ content: 'คุณได้รีวิวสินค้านี้ไปแล้ว!', flags: 64 });
         return;
     }
 
@@ -158,14 +155,13 @@ async function handleReview(interaction, item) {
         .setTitle(`📢 รีวิวสินค้า: **${item.name}**`)
         .setDescription('กรุณาให้คะแนนสินค้า (1-5):');
 
-    await interaction.reply({ embeds: [reviewEmbed], ephemeral: true });
+    await interaction.reply({ embeds: [reviewEmbed], flags: 64 });
 
     const filter = (response) => response.user.id === interaction.user.id && ['1', '2', '3', '4', '5'].includes(response.content);
     const collector = interaction.channel.createMessageCollector({ filter, time: 15000 });
 
     collector.on('collect', async (response) => {
         const rating = parseInt(response.content);
-        // บันทึกรีวิว
         item.reviews.push({ user: interaction.user.id, rating });
 
         await response.reply(`🌟 ขอบคุณสำหรับการให้คะแนน **${item.name}**! คะแนนของคุณคือ ${rating} คะแนน.`);
@@ -174,7 +170,7 @@ async function handleReview(interaction, item) {
 
     collector.on('end', (collected, reason) => {
         if (reason === 'time') {
-            interaction.followUp({ content: 'หมดเวลาในการตอบกลับ', ephemeral: true });
+            interaction.followUp({ content: 'หมดเวลาในการตอบกลับ', flags: 64 });
         }
     });
 }
@@ -183,21 +179,30 @@ async function handleReview(interaction, item) {
 async function sendGift(interaction, recipientId, item) {
     const user = await User.findOne({ userId: interaction.user.id });
     if (!user) {
-        await interaction.reply('ไม่พบข้อมูลผู้ใช้ในระบบ');
+        await interaction.reply({ content: 'ไม่พบข้อมูลผู้ใช้ในระบบ!', flags: 64 });
+        return;
+    }
+
+    const recipient = await User.findOne({ userId: recipientId });
+    if (!recipient) {
+        await interaction.reply({ content: 'ไม่พบผู้รับ!', flags: 64 });
         return;
     }
 
     if (user.balance < item.price) {
-        await interaction.reply('คุณไม่มีเหรียญเพียงพอสำหรับการซื้อของขวัญ');
+        await interaction.reply({ content: 'ยอดเหรียญไม่เพียงพอในการส่งของขวัญ!', flags: 64 });
         return;
     }
 
-    // ลดเหรียญของผู้ให้
     user.balance -= item.price;
+    recipient.balance += item.price;
     await user.save();
-    
-    // ส่งของขวัญ
-    await interaction.reply(`🎁 คุณได้ส่ง **${item.name}** ให้ <@${recipientId}> เป็นของขวัญแล้ว!`);
+    await recipient.save();
+
+    await interaction.reply({
+        content: `🎁 ส่งของขวัญ **${item.name}** ให้ ${recipient.username} สำเร็จ! คุณยังมีเหรียญเหลือ ${user.balance} เหรียญ.`,
+        flags: 64
+    });
 }
 
 module.exports = { showShop, handlePurchase, handleReview, sendGift };
