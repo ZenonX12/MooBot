@@ -1,7 +1,6 @@
 const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const items = require('../items');  // กลับขึ้นไปที่โฟลเดอร์หลัก
-const userBalance = {}; // กำหนดให้เป็นอ็อบเจ็กต์ที่เก็บยอดเงิน (ควรบันทึกลงฐานข้อมูลจริง
-
+const items = require('../items'); // กลับขึ้นไปที่โฟลเดอร์หลัก
+const User = require('../models/User');  // การเรียกใช้โมเดลผู้ใช้จาก MongoDB
 
 // ฟังก์ชันคำนวณราคาสินค้าหลังจากส่วนลด
 function applyDiscount(item, quantity) {
@@ -22,7 +21,7 @@ function showShop(message) {
             { label: 'อุปกรณ์เสริม', value: 'accessories' },
             { label: 'เครื่องประดับ', value: 'jewelry' },
         ]);
-    
+
     const row = new ActionRowBuilder().addComponents(categorySelectMenu);
 
     const embed = new EmbedBuilder()
@@ -45,21 +44,23 @@ function filterItemsByCategory(category) {
 }
 
 // ฟังก์ชันจัดการการซื้อสินค้าของผู้ใช้
-async function handlePurchase(interaction, userBalance) {
-    const itemId = interaction.values[0];  // รับค่า itemId จากเมนู
+async function handlePurchase(interaction) {
+    const itemId = interaction.values[0];  // เปลี่ยนจาก values[1] เป็น values[0]
     console.log("Item ID selected:", itemId);  // ตรวจสอบค่า itemId
     console.log("Available items:", items);   // ตรวจสอบรายการสินค้า    
 
     const item = items.find(i => i.id === itemId);  // หา item ที่ตรงกับ ID
-    if (!item) {  // ตรวจสอบว่า item มีอยู่จริง
+    if (!item) {
         await interaction.reply({
             content: `❌ ไม่พบสินค้าในระบบ.`,
-            ephemeral: true  // ใช้ ephemeral แทน flags
+            ephemeral: true
         });
         return;
     }
-    
-    const userCoins = userBalance[interaction.user.id] || 0;
+
+    // ดึงยอดเงินจากฐานข้อมูล
+    const user = await User.findOne({ userId: interaction.user.id });
+    const userCoins = user ? user.balance : 0;
 
     // ถ้าเงินไม่พอ
     if (userCoins < item.price) {
@@ -106,10 +107,15 @@ async function handlePurchase(interaction, userBalance) {
 
     collector.on('collect', async (response) => {
         if (response.content.toLowerCase() === 'yes') {
-            // ซื้อสำเร็จ
-            userBalance[interaction.user.id] = userCoins - item.price;
-            await response.reply(`🎉 คุณได้ซื้อ **${item.name}** ในราคา ${item.price} เหรียญ! คุณมีเหรียญเหลือ ${userBalance[interaction.user.id]} เหรียญ.`);
-            // บันทึกยอดเงินไปยังฐานข้อมูลจริงที่นี่
+            // คำนวณราคาใหม่หลังจากส่วนลด
+            const quantity = parseInt(interaction.values[1] || '1');
+            const finalPrice = applyDiscount(item, quantity);
+
+            // ลดเหรียญจากผู้ใช้
+            user.balance -= finalPrice;
+            await user.save();
+
+            await response.reply(`🎉 คุณได้ซื้อ **${item.name}** ${quantity} ชิ้น ในราคา ${finalPrice} เหรียญ! คุณมีเหรียญเหลือ ${user.balance} เหรียญ.`);
         } else if (response.content.toLowerCase() === 'no') {
             await response.reply(`🚫 การซื้อ **${item.name}** ถูกยกเลิก.`);
         }
@@ -125,6 +131,12 @@ async function handlePurchase(interaction, userBalance) {
 
 // ฟังก์ชันให้รีวิวสินค้า
 async function handleReview(interaction, item) {
+    const userReview = item.reviews.find(review => review.user === interaction.user.id);
+    if (userReview) {
+        await interaction.reply({ content: 'คุณได้รีวิวสินค้านี้ไปแล้ว!', ephemeral: true });
+        return;
+    }
+
     const reviewEmbed = new EmbedBuilder()
         .setColor('#FFD700')
         .setTitle(`📢 รีวิวสินค้า: **${item.name}**`)
@@ -153,13 +165,15 @@ async function handleReview(interaction, item) {
 
 // ฟังก์ชันส่งของขวัญ
 async function sendGift(interaction, recipientId, item) {
-    if (userBalance[interaction.user.id] < item.price) {
+    const user = await User.findOne({ userId: interaction.user.id });
+    if (user.balance < item.price) {
         await interaction.reply('คุณไม่มีเหรียญเพียงพอสำหรับการซื้อของขวัญ');
         return;
     }
 
     // ลดเหรียญของผู้ให้
-    userBalance[interaction.user.id] -= item.price;
+    user.balance -= item.price;
+    await user.save();
     
     // ส่งของขวัญ
     await interaction.reply(`🎁 คุณได้ส่ง **${item.name}** ให้ <@${recipientId}> เป็นของขวัญแล้ว!`);

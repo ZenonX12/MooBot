@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const items = require('./items');  // Assuming items.js is in the same directory
 const { showShop, handlePurchase } = require('./Commands/shopCommands.js');
+const fightCommand = require('./Commands/fightCommands');  // ใช้เพียง fightCommands
 const config = require('./config');
 const fs = require('fs');
 
@@ -52,7 +53,14 @@ client.on('messageCreate', (message) => {
     if (message.content === '!shop') {
         showShop(message);
     }
+
+    if (message.content === '!fight') {
+        const userId = message.author.id;
+        const userBalance = userBalances[userId] || 0;  // Get the user's balance
+        fightCommand.execute(message, userBalance);  // Pass userBalance correctly
+    }
 });
+
 
 // Command to handle interactions (purchase items)
 client.on('interactionCreate', async (interaction) => {
