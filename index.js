@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, ButtonStyle, ActionRowBuilder, ButtonBuilder, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -26,65 +26,88 @@ client.once('ready', () => {
 // คำสั่งดูรายการสินค้าที่สามารถซื้อได้
 client.on('messageCreate', (message) => {
     if (message.content === '!shop') {
-        const row = new ActionRowBuilder()
-            .addComponents(
-                items.map(item => new ButtonBuilder()
-                    .setCustomId(item.id)
-                    .setLabel(`${item.name} - ${item.price} เหรียญ`)
-                    .setStyle(ButtonStyle.Primary)
-                )
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('select_item')
+            .setPlaceholder('เลือกไอเทมที่คุณต้องการซื้อ')
+            .addOptions(
+                items.map(item => ({
+                    label: `${item.name} - ${item.price} เหรียญ`,
+                    value: item.id,
+                    description: item.description,
+                    emoji: '🛒',
+                }))
             );
+
+        const row = new ActionRowBuilder().addComponents(selectMenu);
 
         // สร้าง Embed เพื่อแสดงร้านค้าให้สวยงาม
         const embed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle('ยินดีต้อนรับสู่ร้านค้า!')
-            .setDescription('เลือกไอเทมที่คุณต้องการซื้อ:')
-            .setThumbnail('https://example.com/shop_thumbnail.png') // เพิ่มภาพธัมเบิลนอล
+            .setColor('#28a745')  // ใช้สีเขียวโมเดิร์น
+            .setTitle('🌟 ยินดีต้อนรับสู่ร้านค้า! 🌟')
+            .setDescription('เลือกไอเทมที่คุณต้องการซื้อจากเมนูด้านล่าง:')
             .addFields(
                 items.map(item => ({
-                    name: `${item.name}`,
-                    value: `${item.description}\nราคา: ${item.price} เหรียญ`
+                    name: `**${item.name}** - ${item.price} เหรียญ`,
+                    value: `*${item.description}*`, // ให้รายละเอียด
+                    inline: true
                 }))
             )
             .setFooter({ text: 'ร้านค้าของเราเปิดตลอด 24 ชั่วโมง!' })
-            .setTimestamp();
+            .setTimestamp()
+            .setImage('https://cdn.discordapp.com/attachments/1336344467178917908/1337042992564932754/a023595a6a0b3ade26fdf39f0b1ce703.gif');  // เพิ่ม GIF ใน Embed
 
         message.channel.send({
             embeds: [embed],
             components: [row]
         });
     }
-
-    // คำสั่งดูจำนวนเงินในบัญชีของผู้ใช้
-    if (message.content === '!balance') {
-        const balance = userBalance[message.author.id] || 0;
-        message.channel.send(`${message.author.username} คุณมี ${balance} เหรียญ`);
-    }
 });
 
-// คำสั่งซื้อสินค้าเมื่อผู้ใช้คลิกปุ่ม
+// คำสั่งซื้อสินค้าเมื่อผู้ใช้เลือกจากเมนู
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
+    if (!interaction.isSelectMenu()) return;
 
-    const itemId = interaction.customId;
+    const itemId = interaction.values[0];
     const item = items.find(i => i.id === itemId);
     const userCoins = userBalance[interaction.user.id] || 0;
 
-    if (userCoins >= item.price) {
-        // ซื้อสำเร็จ
-        userBalance[interaction.user.id] = userCoins - item.price;
-        await interaction.reply({
-            content: `🎉 คุณได้ซื้อ ${item.name} ในราคา ${item.price} เหรียญ! คุณมีเหรียญเหลือ ${userBalance[interaction.user.id]} เหรียญ.`,
-            ephemeral: true
-        });
-    } else {
-        // เงินไม่พอ
-        await interaction.reply({
-            content: `❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ ${item.name}.`,
-            ephemeral: true
-        });
-    }
+    // แสดงยอดเงินของผู้ใช้ก่อนการซื้อ
+    const embed = new EmbedBuilder()
+        .setColor('#28a745')
+        .setTitle('🛍️ ยืนยันการซื้อสินค้า 🛍️')
+        .setDescription(`คุณต้องการซื้อ **${item.name}** ราคา **${item.price}** เหรียญหรือไม่?`)
+        .addFields(
+            { name: 'ยอดเงินของคุณ', value: `${userCoins} เหรียญ`, inline: true },
+            { name: 'ยอดเงินที่เหลือ', value: `${userCoins - item.price} เหรียญ`, inline: true }
+        )
+        .setFooter({ text: 'ตอบกลับเพื่อยืนยันการซื้อ' })
+        .setTimestamp()
+        .setImage(item.image);
+
+    await interaction.reply({
+        content: 'กรุณายืนยันการซื้อสินค้าด้านล่าง',
+        embeds: [embed],
+        ephemeral: true
+    });
+
+    // รอการตอบรับยืนยันการซื้อจากผู้ใช้
+    const filter = (response) => response.user.id === interaction.user.id && ['yes', 'no'].includes(response.content.toLowerCase());
+    const collector = interaction.channel.createMessageCollector({ filter, time: 15000 });
+
+    collector.on('collect', async (response) => {
+        if (response.content.toLowerCase() === 'yes') {
+            // ซื้อสำเร็จ
+            if (userCoins >= item.price) {
+                userBalance[interaction.user.id] = userCoins - item.price;
+                await response.reply(`🎉 คุณได้ซื้อ **${item.name}** ในราคา ${item.price} เหรียญ! คุณมีเหรียญเหลือ ${userBalance[interaction.user.id]} เหรียญ.`);
+            } else {
+                await response.reply(`❌ ขอโทษ, คุณไม่มีเหรียญเพียงพอในการซื้อ **${item.name}**.`);
+            }
+        } else if (response.content.toLowerCase() === 'no') {
+            await response.reply(`🚫 การซื้อ **${item.name}** ถูกยกเลิก.`);
+        }
+        collector.stop();
+    });
 });
 
 client.login(process.env.BOT_TOKEN);
