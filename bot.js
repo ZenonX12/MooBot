@@ -26,9 +26,18 @@ const sendToDiscord = async (message) => {
       .setColor('#00FF00')
       .setTimestamp();
 
-    await axios.post(process.env.DISCORD_WEBHOOK_URL, { embeds: [embed] });
+    const response = await axios.post(process.env.DISCORD_WEBHOOK_URL, { embeds: [embed] }, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (response.status !== 204) {
+      console.error(chalk.red(`Failed to send to Discord: Status code ${response.status}`));
+    }
   } catch (error) {
     console.error(chalk.red('Error sending message to Discord:', error.message));
+    if (error.response) {
+      console.error('Response:', error.response.data);
+    }
   }
 };
 
@@ -64,15 +73,15 @@ const loginBot = async () => {
 client.on('error', (error) => handleBotStatus(chalk.yellow(`⚠️ Error occurred: ${error.message || error}`), error));
 
 // จับข้อผิดพลาดที่ไม่ได้รับการจัดการ
-process.on('uncaughtException', (error) => {
-  handleBotStatus(chalk.red(`⚠️ Uncaught exception: ${error.message || error}`), error);
+process.on('uncaughtException', async (error) => {
+  await handleBotStatus(chalk.red(`⚠️ Uncaught exception: ${error.message || error}`), error);
   process.exit(1);
 });
 
 // การปิดโปรแกรมของบอท
 process.on('SIGINT', async () => {
   console.log('Bot is shutting down...');
-  await handleBotStatus('```🚫 Bot is offline!```');
+  await handleBotStatus('🚫 Bot is offline!');
   process.exit(0);
 });
 
