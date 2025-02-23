@@ -1,111 +1,62 @@
-require('dotenv').config();
+require('dotenv').config(); // โหลดตัวแปรจากไฟล์ .env
+const axios = require('axios');
 const { Client, GatewayIntentBits } = require('discord.js');
-const fightCommand = require('./Commands/fightCommands');
-const { showInventory, addItem, removeItem } = require('./Commands/inventoryCommands.js');
-const config = require('./config');
-const fs = require('fs');
 
-const userBalancesFile = './userBalances.json';
+// ตรวจสอบว่า DISCORD_TOKEN และ DISCORD_WEBHOOK_URL มีค่าหรือไม่
+if (!process.env.DISCORD_TOKEN || !process.env.DISCORD_WEBHOOK_URL) {
+  console.error("Discord token or webhook URL is missing.");
+  process.exit(1);
+}
 
+// สร้าง Client และกำหนด Intent ที่จำเป็น
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
-// โหลดข้อมูลเงินผู้ใช้จากไฟล์
-let userBalances = {};
+// ฟังก์ชันส่งข้อความไปยัง Discord Webhook
+const sendToDiscord = async (message) => {
+  try {
+    await axios.post(process.env.DISCORD_WEBHOOK_URL, { content: message }, { timeout: 5000 });
+  } catch (error) {
+    console.error('Failed to send message to Discord:', error);
+  }
+};
 
-function loadUserBalances() {
-    if (fs.existsSync(userBalancesFile)) {
-        try {
-            const data = fs.readFileSync(userBalancesFile);
-            userBalances = JSON.parse(data);
-        } catch (error) {
-            console.error('❌ Error loading user balances:', error);
-        }
-    } else {
-        console.log('⚠️ No userBalances.json file found. Starting with an empty balance.');
-    }
-}
+// แจ้งสถานะบอทและจัดการข้อผิดพลาด
+const handleBotStatus = async (message, error = null) => {
+  console.log(message);  // แสดงข้อความใน console
+  await sendToDiscord(message);  // ส่งข้อความไปยัง Discord Webhook
+  if (error) console.error('Error:', error); // ถ้ามีข้อผิดพลาดให้แสดง
+};
 
-// บันทึกเงินผู้ใช้ลงไฟล์
-async function saveUserBalances() {
-    try {
-        fs.writeFileSync(userBalancesFile, JSON.stringify(userBalances, null, 2)); // ใช้ writeFileSync แทน
-    } catch (error) {
-        console.error('❌ Error saving user balances:', error);
-    }
-}
+// เมื่อบอทออนไลน์แล้ว
+client.once('ready', () => handleBotStatus('Bot is online!'));
 
-// บอทพร้อมใช้งาน
-client.once('ready', () => {
-    console.log('✅ Bot is online!');
-    loadUserBalances();
+// จัดการข้อผิดพลาดที่เกิดขึ้นจากบอท
+client.on('error', (error) => handleBotStatus(`Error occurred: ${error.message || error}`, error));
+
+// จัดการการล็อกอินที่ล้มเหลว
+client.login(process.env.DISCORD_TOKEN).catch((error) => {
+  handleBotStatus(`Login failed: ${error.message || error}`, error);
+  handleBotStatus('Bot is offline!');
+  process.exit(1);
 });
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-
-    const args = message.content.split(' ');
-    const command = args.shift()?.toLowerCase(); // ใช้ optional chaining เพื่อป้องกันการ error หาก args ว่าง
-
-    if (!command) return; // หากไม่มีคำสั่งให้ไม่ทำอะไร
-
-    const userId = message.author.id;
-
-    // ✅ คำสั่งต่อสู้
-    if (command === '!fight') {
-        const userBalance = userBalances[userId] || 0;
-
-        try {
-            const updatedBalance = await fightCommand.execute(message, userBalance);
-            if (updatedBalance !== userBalance) {
-                userBalances[userId] = updatedBalance;
-                await saveUserBalances();
-            }
-        } catch (error) {
-            console.error('❌ Error during fight:', error);
-            message.reply('⚠️ เกิดข้อผิดพลาดระหว่างการต่อสู้! ลองใหม่อีกครั้ง');
-        }
-        return;
-    }
-
-    // ✅ คำสั่งคลังไอเท็ม
-    if (command === '!inventory') {
-        showInventory(message);
-        return;
-    }
-
-    if (command === '!additem') {
-        const itemName = args.join(' ').trim();
-        if (!itemName) {
-            return message.reply('❌ กรุณาระบุชื่อไอเท็มที่จะเพิ่ม!');
-        }
-        addItem(message, itemName);
-        return;
-    }
-
-    if (command === '!removeitem') {
-        const itemName = args.join(' ').trim();
-        if (!itemName) {
-            return message.reply('❌ กรุณาระบุชื่อไอเท็มที่จะลบ!');
-        }
-        removeItem(message, itemName);
-        return;
-    }
+// การจัดการข้อผิดพลาดในการรับข้อความ
+client.on('messageCreate', (message) => {
+  if (message.author.bot) return;  // ป้องกันไม่ให้บอทตอบกลับตัวเอง
+  // เพิ่มฟังก์ชันที่ต้องการที่นี่
 });
 
-// ✅ บันทึกเงินผู้ใช้ก่อนปิดบอท
+// จับข้อผิดพลาดที่ไม่ได้รับการจัดการ
+process.on('uncaughtException', (error) => {
+  handleBotStatus(`Uncaught exception: ${error.message || error}`, error);
+  process.exit(1);
+});
+
+// จับเหตุการณ์การปิดโปรแกรม (เช่น ctrl+c หรือ exit)
 process.on('SIGINT', async () => {
-    await saveUserBalances();
-    console.log('💾 User balances saved. Exiting...');
-    process.exit();
-});
-
-// ✅ ล็อกอินบอท
-client.login(config.BOT_TOKEN).catch(error => {
-    console.error('❌ Failed to log in:', error);
+  console.log('Bot is shutting down...');
+  await handleBotStatus('Bot is offline!');
+  process.exit(0); // ปิดโปรแกรมอย่างสงบ
 });
