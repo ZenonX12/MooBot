@@ -1,39 +1,58 @@
-// Variable to store player inventory data
+// นำเข้าโมดูลที่จำเป็นจาก discord.js
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+// ตัวแปรสำหรับเก็บข้อมูลอินเวนทอรีของผู้เล่น
 let inventories = {};
 
-// Function to add an item to the inventory
+// ฟังก์ชันสำหรับเพิ่มไอเทมลงในอินเวนทอรี
 function addItemToInventory(userId, item) {
   if (!inventories[userId]) {
-    inventories[userId] = []; // If there's no inventory for the user, create one
+    inventories[userId] = []; // ถ้ายังไม่มีอินเวนทอรีสำหรับผู้ใช้ ให้สร้างอินเวนทอรีใหม่
   }
-  inventories[userId].push(item); // Add the item to the inventory
+  inventories[userId].push(item); // เพิ่มไอเทมลงในอินเวนทอรี
   console.log(`Received ${item.name} from ${userId}`);
 }
 
-// Function to get a user's inventory
+// ฟังก์ชันสำหรับดึงข้อมูลอินเวนทอรีของผู้ใช้
 function getInventory(userId) {
-  return inventories[userId] || []; // If no inventory, return an empty array
+  return inventories[userId] || []; // ถ้าไม่มีอินเวนทอรีให้คืนค่าเป็นอาร์เรย์ว่าง
 }
 
-// Function to display the items in the inventory
-function showInventory(message) {
-  const userId = message.author.id; // Get the user ID of the message sender
+// ฟังก์ชันสำหรับแสดงรายการไอเทมในอินเวนทอรี (ไม่มีปุ่มลบแล้ว)
+async function showInventory(message) {
+  const userId = message.author.id; // ใช้ user ID ของผู้ส่งข้อความ
   const userInventory = getInventory(userId);
-  
-  if (!userInventory || userInventory.length === 0) {
-    return message.reply("You have no items in your inventory!"); // If there are no items
-  }
-  
-  // Create a message listing the items
-  const itemsList = userInventory
-    .map((item, index) => `${index + 1}. ${item.name} - ${item.description}`)
-    .join('\n'); // Create a string with each item listed
 
-  // Send the message displaying the item list
-  message.reply(`You have the following items in your inventory:\n${itemsList}`);
+  if (!userInventory || userInventory.length === 0) {
+    return message.reply("You have no items in your inventory!"); // ถ้าไม่มีไอเทม
+  }
+
+  // สร้าง Embed ใหม่สำหรับแสดงอินเวนทอรี
+  const inventoryEmbed = new EmbedBuilder()
+    .setTitle(`${message.author.username}'s Inventory`) // หัวข้อที่แสดงชื่อผู้ใช้
+    .setColor('#3b82f6') // เปลี่ยนสีของ Embed ให้ดูโดดเด่น
+    .setThumbnail(message.author.avatarURL()) // ใช้รูปโปรไฟล์ของผู้ใช้
+    .setDescription(`Here is the list of items in your inventory!`) // เพิ่มคำอธิบาย
+    .setTimestamp() // เพิ่มเวลาในการส่งข้อความ
+    .setFooter({
+      text: 'Inventory System',
+      iconURL: 'https://i.imgur.com/xyz1234.png', // คุณสามารถใช้ URL ของไอคอนที่ต้องการ
+    });
+
+  // ลูปผ่านไอเทมและเพิ่มฟิลด์ลงใน Embed
+  userInventory.forEach((item, index) => {
+    inventoryEmbed.addFields({
+      name: `Item ${index + 1}: ${item.name}`,
+      value: `${item.description}\n**Type:** ${item.type}\n**Rarity:** ${item.rarity}`, // เพิ่มรายละเอียดไอเทม
+      inline: false,
+    });
+  });
+
+  // ส่งข้อความ Embed ที่แสดงอินเวนทอรี
+  await message.reply({ embeds: [inventoryEmbed] });
 }
 
-// Export functions to be used externally
+// ส่งออกฟังก์ชันที่สามารถใช้งานได้จากภายนอก
 module.exports = {
   addItemToInventory,
   getInventory,
