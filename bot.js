@@ -1,10 +1,13 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const ZombieCommand = require('./commands/ZombieCommand');
 const axios = require('axios');
 const chalk = require('chalk');
 
-// ฟังก์ชันส่งข้อความไปยัง Discord Webhook
+// Importing commands
+const ZombieCommand = require('./commands/ZombieCommand');
+const InventoryCommand = require('./commands/inventoryCommand');
+
+// Webhook utility function
 const sendToDiscordWebhook = async (title, message, color = '#FF0000') => {
   try {
     const embed = new EmbedBuilder()
@@ -21,24 +24,25 @@ const sendToDiscordWebhook = async (title, message, color = '#FF0000') => {
   }
 };
 
-// ตั้งค่าบอท
+// Initialize Discord bot client
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
-// เมื่อบอทออนไลน์
+// Handle bot startup
 client.once('ready', async () => {
   console.log(chalk.green('✅ Bot is online and ready to go!'));
   await sendToDiscordWebhook('✅ Bot Online', '```The bot is running and ready!```', '#00FF00');
 });
 
-// จัดการข้อความที่ได้รับ
+// Handle incoming messages
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   const args = message.content.trim().split(/\s+/);
   const commandName = args.shift().toLowerCase();
 
+  // Command: !zombie
   if (commandName === '!zombie') {
     try {
       await ZombieCommand.execute(message);
@@ -48,31 +52,42 @@ client.on('messageCreate', async (message) => {
       await sendToDiscordWebhook('❌ Error executing !zombie', error.message);
     }
   }
+
+  // Command: !inventory
+  if (commandName === '!inventory') {
+    try {
+      await InventoryCommand.showInventory(message); // Call showInventory from InventoryCommand
+    } catch (error) {
+      console.error(chalk.red(`❌ Error executing !inventory: ${error.message}`));
+      message.reply('An error occurred while executing the command.');
+      await sendToDiscordWebhook('❌ Error executing !inventory', error.message);
+    }
+  }
 });
 
-// แจ้งเตือนเมื่อบอทถูกตัดการเชื่อมต่อ
+// Handle bot disconnection
 client.on('shardDisconnect', async (event, id) => {
   console.warn(chalk.yellow(`⚠️ Disconnected (Shard ID: ${id})`));
   await sendToDiscordWebhook('⚠️ Bot Offline', `The bot disconnected (Shard ID: ${id})`, '#FFA500');
 });
 
-// จัดการการปิดตัวของบอท
+// Handle bot shutdown
 const shutdownHandler = async (reason) => {
   console.warn(chalk.yellow(`⚠️ Shutting down: ${reason}`));
   
-  await Promise.allSettled([
+  await Promise.allSettled([ 
     sendToDiscordWebhook('⚠️ Bot Offline', `Shutting down: ${reason}`, '#FFA500')
   ]);
 
   process.exit(0);
 };
 
-// ดักจับเหตุการณ์ที่ทำให้บอทปิดตัว
-['beforeExit', 'SIGINT', 'SIGTERM'].forEach(event => 
+// Listen for shutdown signals
+['beforeExit', 'SIGINT', 'SIGTERM'].forEach(event =>
   process.on(event, () => shutdownHandler(`Received ${event}`))
 );
 
-// ล็อกอินบอท
+// Bot login
 client.login(process.env.DISCORD_TOKEN).catch(async (error) => {
   console.error(chalk.red(`❌ Login Error: ${error.message}`));
   await sendToDiscordWebhook('❌ Error logging in', error.message);
