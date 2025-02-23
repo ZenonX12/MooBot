@@ -1,74 +1,59 @@
+
 ```
-# Discord Bot Shop
+# MooBot
 
-🎉 **Welcome to the Discord Bot Shop!** 🎉
+MooBot is a versatile and interactive Discord bot designed to add excitement and utility to your server. From managing in-game inventories and battling fierce monsters to collecting rewards, MooBot brings immersive experiences to your community. The bot is in active development, and new features are constantly being added.
 
-This bot allows users to interact with a virtual shop in Discord, where they can view and purchase items using in-game currency. The bot is built with Node.js and Discord.js and is designed to provide a fun and engaging way for users to buy items and manage their virtual balance.
+## 🚧 **Project Status: In Development**  
+**Started on February 22, 2025**, this bot is a work in progress with continuous updates.
 
 ## Features
 
-- **View Items**: Users can view a list of items available for purchase.
-- **Item Description**: Each item has a detailed description to help users make a choice.
-- **Currency System**: The bot tracks the user's balance and deducts the correct amount when items are purchased.
-- **Easy Interaction**: Users can interact with the bot using simple commands and a menu to select the item they want to buy.
+- **Inventory System**: Users can store, add, and remove items from their personal inventory.
+- **Battle System**: Engage in thrilling monster fights, earning rewards, XP, and occasionally rare items.
+- **Cooldown System**: Built-in cooldowns ensure users can't spam commands.
   
-## Current Development
+## Installation
 
-⚙️ **Development started on February 22, 2025**  
-We are actively working on adding more features, improving the user experience, and enhancing the functionality of the shop system.
-
-## Getting Started
-
-To set up and run the bot locally, follow these steps:
-
-1. Clone the repository:
-
-   ```
-   bash
+1. **Clone the Repository**:
+   To get started, clone this repo to your local machine:
+   ```bash
    git clone https://github.com/ZenonX12/MooBot.git
    cd MooBot
    ```
 
-2. Install dependencies:
-
+2. **Install Dependencies**:
+   Use npm to install the necessary packages:
    ```bash
    npm install
    ```
 
-3. Set up your `.env` file with the necessary credentials (make sure to include your Discord bot token):
-
+3. **Configure the Bot**:
+   In the project root directory, create a `.env` file to store your Discord bot token:
    ```bash
-   BOT_TOKEN=your-discord-bot-token
+   BOT_TOKEN=your_discord_bot_token
    ```
 
-4. Run the bot:
-
+4. **Run the Bot**:
+   Launch the bot with the following command:
    ```bash
-   node bot.js
+   node index.js
    ```
 
-5. Enjoy using your Discord bot with the shop system!
+## Usage
+
+Once the bot is running, use the following commands to interact:
+
+- **`!fight`**: Battle against monsters and earn rewards.
+- **`!inventory`**: View your current inventory.
+- **`!additem <item>`**: Admin command to add items to a user's inventory.
+- **`!removeitem <item>`**: Admin command to remove items from a user's inventory.
 
 ## Contributing
 
-We welcome contributions from the community! If you have any suggestions, bug fixes, or improvements, please feel free to open an issue or submit a pull request.
+Contributions are welcome! If you have suggestions, find bugs, or want to contribute new features, please open an issue or pull request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-Thank you for checking out the **Discord Bot Shop**. Stay tuned for new features and updates as we continue development!
-
-```
-
-### การอธิบาย:
-- **หัวข้อ**: คำอธิบายเกี่ยวกับโปรเจกต์, ฟีเจอร์ต่าง ๆ ที่มีในบอท.
-- **พัฒนาอยู่ในปัจจุบัน**: บอกว่าโปรเจกต์กำลังพัฒนาเริ่มตั้งแต่วันนี้ (22 กุมภาพันธ์ 2025).
-- **การตั้งค่า**: คำแนะนำในการตั้งค่าและใช้งานบอทบนเครื่องของผู้ใช้งาน.
-- **การมีส่วนร่วม**: เชิญชวนให้ผู้คนช่วยพัฒนาและส่งคำแนะนำหรือแก้ไขข้อผิดพลาด.
-- **ใบอนุญาต**: รวมถึงข้อมูลเกี่ยวกับใบอนุญาตโปรเจกต์.
-
-
+This project is licensed under the **MIT License**.
 ```
