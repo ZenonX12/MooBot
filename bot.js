@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');  
-const fightCommand = require('./Commands/fightCommands');  
+const { Client, GatewayIntentBits } = require('discord.js');
+const fightCommand = require('./Commands/fightCommands');
 const { showInventory, addItem, removeItem } = require('./Commands/inventoryCommands.js');
 const config = require('./config');
 const fs = require('fs');
@@ -26,13 +26,15 @@ function loadUserBalances() {
         } catch (error) {
             console.error('❌ Error loading user balances:', error);
         }
+    } else {
+        console.log('⚠️ No userBalances.json file found. Starting with an empty balance.');
     }
 }
 
 // บันทึกเงินผู้ใช้ลงไฟล์
 async function saveUserBalances() {
     try {
-        await fs.promises.writeFile(userBalancesFile, JSON.stringify(userBalances, null, 2));
+        fs.writeFileSync(userBalancesFile, JSON.stringify(userBalances, null, 2)); // ใช้ writeFileSync แทน
     } catch (error) {
         console.error('❌ Error saving user balances:', error);
     }
@@ -48,12 +50,15 @@ client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
     const args = message.content.split(' ');
-    const command = args.shift().toLowerCase();
+    const command = args.shift()?.toLowerCase(); // ใช้ optional chaining เพื่อป้องกันการ error หาก args ว่าง
+
+    if (!command) return; // หากไม่มีคำสั่งให้ไม่ทำอะไร
+
     const userId = message.author.id;
 
     // ✅ คำสั่งต่อสู้
     if (command === '!fight') {
-        const userBalance = userBalances[userId] || 0;  
+        const userBalance = userBalances[userId] || 0;
 
         try {
             const updatedBalance = await fightCommand.execute(message, userBalance);
@@ -75,13 +80,19 @@ client.on('messageCreate', async (message) => {
     }
 
     if (command === '!additem') {
-        const itemName = args.join(' ');
+        const itemName = args.join(' ').trim();
+        if (!itemName) {
+            return message.reply('❌ กรุณาระบุชื่อไอเท็มที่จะเพิ่ม!');
+        }
         addItem(message, itemName);
         return;
     }
 
     if (command === '!removeitem') {
-        const itemName = args.join(' ');
+        const itemName = args.join(' ').trim();
+        if (!itemName) {
+            return message.reply('❌ กรุณาระบุชื่อไอเท็มที่จะลบ!');
+        }
         removeItem(message, itemName);
         return;
     }

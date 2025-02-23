@@ -4,7 +4,7 @@ const fs = require('fs');
 const userStats = {};
 const cooldowns = new Map();
 const inventory = {};
-const userBalance = {}; // คลังเหรียญของผู้ใช้
+const userBalance = {}; 
 const dataFile = './userData.json';
 
 // โหลดข้อมูลจากไฟล์ JSON
