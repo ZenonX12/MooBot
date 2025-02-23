@@ -1,39 +1,39 @@
-// ตัวแปรสำหรับเก็บข้อมูลอินเวนทอรีของผู้เล่น
+// Variable to store player inventory data
 let inventories = {};
 
-// ฟังก์ชันเพิ่มไอเทมลงในอินเวนทอรี
+// Function to add an item to the inventory
 function addItemToInventory(userId, item) {
   if (!inventories[userId]) {
-    inventories[userId] = []; // ถ้ายังไม่มีอินเวนทอรีสำหรับผู้ใช้
+    inventories[userId] = []; // If there's no inventory for the user, create one
   }
-  inventories[userId].push(item); // เพิ่มไอเทมลงในอินเวนทอรี
-  console.log(`เพิ่มไอเทม ${item.name} ให้กับผู้ใช้ ${userId}`);
+  inventories[userId].push(item); // Add the item to the inventory
+  console.log(`Received ${item.name} from ${userId}`);
 }
 
-// ฟังก์ชันดึงข้อมูลอินเวนทอรีของผู้ใช้
+// Function to get a user's inventory
 function getInventory(userId) {
-  return inventories[userId] || []; // ถ้าไม่มีข้อมูลให้คืนค่าเป็นอาร์เรย์ว่าง
+  return inventories[userId] || []; // If no inventory, return an empty array
 }
 
-// ฟังก์ชันแสดงรายการไอเทมในอินเวนทอรี
+// Function to display the items in the inventory
 function showInventory(message) {
-  const userId = message.author.id; // ใช้ user ID ของผู้ส่งข้อความ
+  const userId = message.author.id; // Get the user ID of the message sender
   const userInventory = getInventory(userId);
   
   if (!userInventory || userInventory.length === 0) {
-    return message.reply("คุณไม่มีไอเทมในอินเวนทอรี!"); // ถ้าไม่มีไอเทม
+    return message.reply("You have no items in your inventory!"); // If there are no items
   }
   
-  // สร้างข้อความแสดงรายการไอเทม
+  // Create a message listing the items
   const itemsList = userInventory
     .map((item, index) => `${index + 1}. ${item.name} - ${item.description}`)
-    .join('\n'); // สร้างข้อความที่ประกอบด้วยไอเทมแต่ละตัว
+    .join('\n'); // Create a string with each item listed
 
-  // ส่งข้อความที่แสดงรายการไอเทม
-  message.reply(`คุณมีไอเทมในอินเวนทอรี:\n${itemsList}`);
+  // Send the message displaying the item list
+  message.reply(`You have the following items in your inventory:\n${itemsList}`);
 }
 
-// ส่งออกฟังก์ชันที่สามารถใช้งานได้จากภายนอก
+// Export functions to be used externally
 module.exports = {
   addItemToInventory,
   getInventory,
