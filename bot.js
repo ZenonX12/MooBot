@@ -1,62 +1,81 @@
 require('dotenv').config(); // โหลดตัวแปรจากไฟล์ .env
 const axios = require('axios');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const chalk = require('chalk');  // ใช้ chalk สำหรับสี
 
-// ตรวจสอบว่า DISCORD_TOKEN และ DISCORD_WEBHOOK_URL มีค่าหรือไม่
-if (!process.env.DISCORD_TOKEN || !process.env.DISCORD_WEBHOOK_URL) {
-  console.error("Discord token or webhook URL is missing.");
-  process.exit(1);
-}
+// ฟังก์ชันเช็คค่า DISCORD_TOKEN และ DISCORD_WEBHOOK_URL
+const checkEnvVars = () => {
+  if (!process.env.DISCORD_TOKEN || !process.env.DISCORD_WEBHOOK_URL) {
+    console.error(chalk.red("Missing Discord token or webhook URL"));
+    process.exit(1);
+  }
+
+  const webhookRegex = /^https:\/\/discord.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/;
+  if (!webhookRegex.test(process.env.DISCORD_WEBHOOK_URL)) {
+    console.error(chalk.red("Invalid Discord webhook URL format"));
+    process.exit(1);
+  }
+};
+
+// ฟังก์ชันที่ส่งข้อความไปยัง Discord Webhook
+const sendToDiscord = async (message) => {
+  try {
+    const embed = new EmbedBuilder()
+      .setTitle('Bot Status')
+      .setDescription(message)
+      .setColor('#00FF00')
+      .setTimestamp();
+
+    await axios.post(process.env.DISCORD_WEBHOOK_URL, { embeds: [embed] });
+  } catch (error) {
+    console.error(chalk.red('Error sending message to Discord:', error.message));
+  }
+};
+
+// ฟังก์ชันจัดการสถานะบอท
+const handleBotStatus = async (message, error = null) => {
+  console.log(message);
+  await sendToDiscord(`\`\`\`${message}\`\`\``);
+  if (error) console.error(chalk.red('Error:', error));
+};
 
 // สร้าง Client และกำหนด Intent ที่จำเป็น
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
-// ฟังก์ชันส่งข้อความไปยัง Discord Webhook
-const sendToDiscord = async (message) => {
+// เมื่อบอทออนไลน์แล้ว
+client.once('ready', () => {
+  handleBotStatus('🚀 Bot is online! 🌟');
+  console.log(chalk.magenta('Credits: by Xeno & Moobot'));
+});
+
+// การล็อกอินของบอท
+const loginBot = async () => {
   try {
-    await axios.post(process.env.DISCORD_WEBHOOK_URL, { content: message }, { timeout: 5000 });
+    await client.login(process.env.DISCORD_TOKEN);
   } catch (error) {
-    console.error('Failed to send message to Discord:', error);
+    handleBotStatus(chalk.red(`❌ Login failed: ${error.message || error}`), error);
+    process.exit(1);
   }
 };
 
-// แจ้งสถานะบอทและจัดการข้อผิดพลาด
-const handleBotStatus = async (message, error = null) => {
-  console.log(message);  // แสดงข้อความใน console
-  await sendToDiscord(message);  // ส่งข้อความไปยัง Discord Webhook
-  if (error) console.error('Error:', error); // ถ้ามีข้อผิดพลาดให้แสดง
-};
-
-// เมื่อบอทออนไลน์แล้ว
-client.once('ready', () => handleBotStatus('Bot is online!'));
-
-// จัดการข้อผิดพลาดที่เกิดขึ้นจากบอท
-client.on('error', (error) => handleBotStatus(`Error occurred: ${error.message || error}`, error));
-
-// จัดการการล็อกอินที่ล้มเหลว
-client.login(process.env.DISCORD_TOKEN).catch((error) => {
-  handleBotStatus(`Login failed: ${error.message || error}`, error);
-  handleBotStatus('Bot is offline!');
-  process.exit(1);
-});
-
-// การจัดการข้อผิดพลาดในการรับข้อความ
-client.on('messageCreate', (message) => {
-  if (message.author.bot) return;  // ป้องกันไม่ให้บอทตอบกลับตัวเอง
-  // เพิ่มฟังก์ชันที่ต้องการที่นี่
-});
+// การจัดการข้อผิดพลาดที่เกิดขึ้นจากบอท
+client.on('error', (error) => handleBotStatus(chalk.yellow(`⚠️ Error occurred: ${error.message || error}`), error));
 
 // จับข้อผิดพลาดที่ไม่ได้รับการจัดการ
 process.on('uncaughtException', (error) => {
-  handleBotStatus(`Uncaught exception: ${error.message || error}`, error);
+  handleBotStatus(chalk.red(`⚠️ Uncaught exception: ${error.message || error}`), error);
   process.exit(1);
 });
 
-// จับเหตุการณ์การปิดโปรแกรม (เช่น ctrl+c หรือ exit)
+// การปิดโปรแกรมของบอท
 process.on('SIGINT', async () => {
   console.log('Bot is shutting down...');
-  await handleBotStatus('Bot is offline!');
-  process.exit(0); // ปิดโปรแกรมอย่างสงบ
+  await handleBotStatus('```🚫 Bot is offline!```');
+  process.exit(0);
 });
+
+// เรียกใช้ฟังก์ชันที่จำเป็น
+checkEnvVars();
+loginBot();
