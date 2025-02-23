@@ -1,6 +1,6 @@
 require('dotenv').config(); // โหลด environment variables จาก .env
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');  // เพิ่ม EmbedBuilder ที่นี่
-const fightCommand = require('./commands/fight');  // นำเข้าไฟล์คำสั่ง fight
+const fightCommand = require('./commands/Zombie');  // นำเข้าไฟล์คำสั่ง Zombie 
 const axios = require('axios');
 const chalk = require('chalk');
 const fs = require('fs');
@@ -80,7 +80,7 @@ client.on('messageCreate', async (message) => {
   const commandName = args.shift().toLowerCase();
 
   // Check if the command exists in the commands map
-  if (commandName === '!fight') {
+  if (commandName === '!Zombie') {
     try {
       await fightCommand.execute(message);
     } catch (error) {

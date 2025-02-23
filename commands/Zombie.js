@@ -3,7 +3,7 @@ const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
 module.exports = {
   data: {
-    name: '!fight',
+    name: '!Zombie',
     description: 'เข้าร่วมการต่อสู้กับมอนสเตอร์ Zombie แบบสุ่ม!',
   },
 
