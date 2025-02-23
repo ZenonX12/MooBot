@@ -1,15 +1,12 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
-const items = require('./items');  // Assuming items.js is in the same directory
-const { showShop, handlePurchase } = require('./Commands/shopCommands.js');
-const fightCommand = require('./Commands/fightCommands');  // ใช้เพียง fightCommands
+const { Client, GatewayIntentBits } = require('discord.js');  
+const fightCommand = require('./Commands/fightCommands');  
+const { showInventory, addItem, removeItem } = require('./Commands/inventoryCommands.js');
 const config = require('./config');
 const fs = require('fs');
 
-// Path to the user balances file
 const userBalancesFile = './userBalances.json';
 
-// Initialize the bot client
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -18,92 +15,86 @@ const client = new Client({
     ]
 });
 
-// Store user balances, will load from file on bot startup
+// โหลดข้อมูลเงินผู้ใช้จากไฟล์
 let userBalances = {};
 
-// Function to load user balances from file
 function loadUserBalances() {
     if (fs.existsSync(userBalancesFile)) {
         try {
             const data = fs.readFileSync(userBalancesFile);
             userBalances = JSON.parse(data);
         } catch (error) {
-            console.error('Error loading user balances:', error);
+            console.error('❌ Error loading user balances:', error);
         }
     }
 }
 
-// Function to save user balances to file
-function saveUserBalances() {
+// บันทึกเงินผู้ใช้ลงไฟล์
+async function saveUserBalances() {
     try {
-        fs.writeFileSync(userBalancesFile, JSON.stringify(userBalances, null, 2));
+        await fs.promises.writeFile(userBalancesFile, JSON.stringify(userBalances, null, 2));
     } catch (error) {
-        console.error('Error saving user balances:', error);
+        console.error('❌ Error saving user balances:', error);
     }
 }
 
-// Event: Bot is ready
+// บอทพร้อมใช้งาน
 client.once('ready', () => {
-    console.log('Bot is online!');
-    loadUserBalances();  // Load balances when the bot starts
+    console.log('✅ Bot is online!');
+    loadUserBalances();
 });
 
-// Command to show the shop and fight commands separately
-client.on('messageCreate', (message) => {
-    if (message.author.bot) return; // Prevent bot from responding to its own messages
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
 
-    // Check for !shop command first
-    if (message.content === '!shop') {
-        showShop(message);
-        return;  // Ensure that the rest of the code doesn't execute after handling the shop command
+    const args = message.content.split(' ');
+    const command = args.shift().toLowerCase();
+    const userId = message.author.id;
+
+    // ✅ คำสั่งต่อสู้
+    if (command === '!fight') {
+        const userBalance = userBalances[userId] || 0;  
+
+        try {
+            const updatedBalance = await fightCommand.execute(message, userBalance);
+            if (updatedBalance !== userBalance) {
+                userBalances[userId] = updatedBalance;
+                await saveUserBalances();
+            }
+        } catch (error) {
+            console.error('❌ Error during fight:', error);
+            message.reply('⚠️ เกิดข้อผิดพลาดระหว่างการต่อสู้! ลองใหม่อีกครั้ง');
+        }
+        return;
     }
 
-    // Check for !fight command
-    if (message.content === '!fight') {
-        const userId = message.author.id;
-        const userBalance = userBalances[userId] || 0;  // Get the user's balance
-        fightCommand.execute(message, userBalance)  // Pass userBalance correctly
-            .then((updatedBalance) => {
-                // Save updated balance if necessary
-                if (updatedBalance !== userBalance) {
-                    userBalances[userId] = updatedBalance;
-                    saveUserBalances();
-                }
-            })
-            .catch((error) => {
-                console.error('Error during fight:', error);
-            });
+    // ✅ คำสั่งคลังไอเท็ม
+    if (command === '!inventory') {
+        showInventory(message);
+        return;
     }
-});
 
-// Command to handle interactions (purchase items)
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isSelectMenu()) return;
+    if (command === '!additem') {
+        const itemName = args.join(' ');
+        addItem(message, itemName);
+        return;
+    }
 
-    try {
-        await handlePurchase(interaction, userBalances);
-
-        // After handling purchase, update the balance
-        const userId = interaction.user.id;
-        const newBalance = userBalances[userId] || 0;
-        userBalances[userId] = newBalance;  // Ensure that the balance is updated after purchase
-        saveUserBalances();  // Save balances after any transaction
-    } catch (error) {
-        console.error('Error handling purchase:', error);
-        await interaction.reply({
-            content: '❌ Something went wrong with the purchase. Please try again later.',
-            ephemeral: true
-        });
+    if (command === '!removeitem') {
+        const itemName = args.join(' ');
+        removeItem(message, itemName);
+        return;
     }
 });
 
-// Save balances before the bot shuts down
-process.on('SIGINT', () => {
-    saveUserBalances();
+// ✅ บันทึกเงินผู้ใช้ก่อนปิดบอท
+process.on('SIGINT', async () => {
+    await saveUserBalances();
+    console.log('💾 User balances saved. Exiting...');
     process.exit();
 });
 
-// Bot login
+// ✅ ล็อกอินบอท
 client.login(config.BOT_TOKEN).catch(error => {
-    console.error('Failed to log in:', error);
+    console.error('❌ Failed to log in:', error);
 });
