@@ -1,9 +1,12 @@
-require('dotenv').config(); // โหลดตัวแปรจากไฟล์ .env
+require('dotenv').config(); // โหลด environment variables จาก .env
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');  // เพิ่ม EmbedBuilder ที่นี่
+const fightCommand = require('./commands/fight');  // นำเข้าไฟล์คำสั่ง fight
 const axios = require('axios');
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const chalk = require('chalk');  // ใช้ chalk สำหรับสี
+const chalk = require('chalk');
+const fs = require('fs');
+const path = require('path');
 
-// ฟังก์ชันเช็คค่า DISCORD_TOKEN และ DISCORD_WEBHOOK_URL
+// Function to check the values of DISCORD_TOKEN and DISCORD_WEBHOOK_URL
 const checkEnvVars = () => {
   if (!process.env.DISCORD_TOKEN || !process.env.DISCORD_WEBHOOK_URL) {
     console.error(chalk.red("Missing Discord token or webhook URL"));
@@ -17,10 +20,10 @@ const checkEnvVars = () => {
   }
 };
 
-// ฟังก์ชันที่ส่งข้อความไปยัง Discord Webhook
+// Function to send messages to Discord Webhook
 const sendToDiscord = async (message) => {
   try {
-    const embed = new EmbedBuilder()
+    const embed = new EmbedBuilder()  // ใช้ EmbedBuilder ที่นี่
       .setTitle('Bot Status')
       .setDescription(message)
       .setColor('#00FF00')
@@ -41,25 +44,25 @@ const sendToDiscord = async (message) => {
   }
 };
 
-// ฟังก์ชันจัดการสถานะบอท
+// Function to handle bot status
 const handleBotStatus = async (message, error = null) => {
   console.log(message);
   await sendToDiscord(`\`\`\`${message}\`\`\``);
   if (error) console.error(chalk.red('Error:', error));
 };
 
-// สร้าง Client และกำหนด Intent ที่จำเป็น
+// Create Client and set necessary intents
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
-// เมื่อบอทออนไลน์แล้ว
+// When the bot is online
 client.once('ready', () => {
   handleBotStatus('🚀 Bot is online! 🌟');
   console.log(chalk.magenta('Credits: by Xeno & Moobot'));
 });
 
-// การล็อกอินของบอท
+// Log in the bot
 const loginBot = async () => {
   try {
     await client.login(process.env.DISCORD_TOKEN);
@@ -69,22 +72,40 @@ const loginBot = async () => {
   }
 };
 
-// การจัดการข้อผิดพลาดที่เกิดขึ้นจากบอท
+// Handling messages
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;  // ป้องกันไม่ให้บอทตอบข้อความตัวเอง
+
+  const args = message.content.trim().split(/\s+/);
+  const commandName = args.shift().toLowerCase();
+
+  // Check if the command exists in the commands map
+  if (commandName === '!fight') {
+    try {
+      await fightCommand.execute(message);
+    } catch (error) {
+      console.error(chalk.red('Error executing command:', error.message));
+      message.reply('An error occurred while executing the command');
+    }
+  }
+});
+
+// Handling errors from the bot
 client.on('error', (error) => handleBotStatus(chalk.yellow(`⚠️ Error occurred: ${error.message || error}`), error));
 
-// จับข้อผิดพลาดที่ไม่ได้รับการจัดการ
+// Handling uncaught exceptions
 process.on('uncaughtException', async (error) => {
   await handleBotStatus(chalk.red(`⚠️ Uncaught exception: ${error.message || error}`), error);
   process.exit(1);
 });
 
-// การปิดโปรแกรมของบอท
+// Handling bot shutdown
 process.on('SIGINT', async () => {
   console.log('Bot is shutting down...');
   await handleBotStatus('🚫 Bot is offline!');
   process.exit(0);
 });
 
-// เรียกใช้ฟังก์ชันที่จำเป็น
+// Call necessary functions
 checkEnvVars();
 loginBot();
