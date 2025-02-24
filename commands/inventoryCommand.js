@@ -2,14 +2,26 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 
 let inventories = {}; // เก็บข้อมูลอินเวนทอรีของผู้เล่น
 const ITEMS_PER_PAGE = 5; // จำนวนไอเทมต่อหน้า
+const MAX_ITEMS = 100; // กำหนดจำนวนสูงสุดของไอเทมใน inventory
 
 // ฟังก์ชันเพิ่มไอเทมลงในอินเวนทอรี
 function addItemToInventory(userId, item) {
+  if (!item || !item.name || !item.description || !item.type || !item.rarity) {
+    console.error("❌ Invalid item structure:", item);
+    return "❌ Item is invalid!";
+  }
+
   if (!inventories[userId]) {
     inventories[userId] = [];
   }
+
+  if (inventories[userId].length >= MAX_ITEMS) {
+    return "🚫 Your inventory is full!";
+  }
+
   inventories[userId].push(item);
-  console.log(`Received ${item.name} from ${userId}`);
+  console.log(`✅ Added ${item.name} to ${userId}'s inventory`);
+  return `🎉 **${item.name}** has been added to your inventory!`;
 }
 
 // ฟังก์ชันดึงข้อมูลอินเวนทอรีของผู้ใช้
@@ -20,6 +32,8 @@ function getInventory(userId) {
 // ฟังก์ชันแสดงอินเวนทอรี พร้อมปุ่มเลื่อนหน้า
 async function showInventory(message, page = 1) {
   const userId = message.author.id;
+  if (!userId) return; // ตรวจสอบว่ามี userId หรือไม่
+
   const userInventory = getInventory(userId);
 
   if (!userInventory.length) {
@@ -35,22 +49,22 @@ async function showInventory(message, page = 1) {
 
   const inventoryEmbed = new EmbedBuilder()
     .setTitle(`📦 ${message.author.username}'s Inventory`)
-    .setColor('#4CAF50') // สีเขียวดูสดใส
+    .setColor('#2ECC71') // สีเขียวสดใส
     .setThumbnail(message.author.avatarURL())
-    .setDescription(`Showing items **${start + 1} - ${Math.min(end, userInventory.length)}** out of **${userInventory.length}**`)
-    .setFooter({ text: `Page ${page} of ${totalPages}` })
+    .setDescription(`📜 Showing items **${start + 1} - ${Math.min(end, userInventory.length)}** out of **${userInventory.length}**`)
+    .setFooter({ text: `Page ${page} of ${totalPages} • Max ${MAX_ITEMS} items` })
     .setTimestamp();
 
   // เพิ่มไอเทมลงใน Embed
   itemsOnPage.forEach((item, index) => {
     inventoryEmbed.addFields({
-      name: `🔹 ${item.name}`,
-      value: `💬 **Description:** ${item.description}\n🎭 **Type:** ${item.type}\n✨ **Rarity:** ${item.rarity}`,
+      name: `🔹 ${item.name} (${item.rarity})`,
+      value: `💬 **${item.description}**\n🎭 **Type:** ${item.type}`,
       inline: false,
     });
   });
 
-  // ปุ่มเลื่อนหน้า
+  // ปุ่มควบคุม
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`prev_page_${userId}_${page}`)
@@ -62,19 +76,25 @@ async function showInventory(message, page = 1) {
       .setCustomId(`next_page_${userId}_${page}`)
       .setLabel('Next ▶')
       .setStyle(ButtonStyle.Primary)
-      .setDisabled(page === totalPages)
+      .setDisabled(page === totalPages),
+
+    new ButtonBuilder()
+      .setCustomId(`close_inventory_${userId}`)
+      .setLabel('🔴 Close')
+      .setStyle(ButtonStyle.Danger)
   );
 
   // ส่ง Embed และปุ่ม
   const reply = await message.reply({ embeds: [inventoryEmbed], components: [row] });
 
-  // ตัวจับปุ่มกดสำหรับเลื่อนหน้า
-  const filter = (interaction) => interaction.customId.startsWith(`prev_page_${userId}_`) || interaction.customId.startsWith(`next_page_${userId}_`);
+  // ตัวจับปุ่มกด
+  const filter = (interaction) => interaction.user.id === userId;
   const collector = reply.createMessageComponentCollector({ filter, time: 60000 });
 
   collector.on('collect', async (interaction) => {
-    if (interaction.user.id !== userId) {
-      return interaction.reply({ content: "❌ **You can't interact with this inventory!**", ephemeral: true });
+    if (interaction.customId === `close_inventory_${userId}`) {
+      await interaction.update({ content: "🛑 **Inventory closed!**", embeds: [], components: [] });
+      return;
     }
 
     let newPage = page;
@@ -86,7 +106,7 @@ async function showInventory(message, page = 1) {
   });
 
   collector.on('end', () => {
-    reply.edit({ components: [] }).catch(() => {});
+    reply.edit({ components: [] }).catch(() => {}); // ปรับให้แก้ไขปุ่มเมื่อเวลาเกิน
   });
 }
 

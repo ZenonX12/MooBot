@@ -3,11 +3,12 @@ const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const chalk = require('chalk');
 
-// Importing commands
+// นำเข้าคำสั่ง
 const ZombieCommand = require('./commands/ZombieCommand');
 const InventoryCommand = require('./commands/inventoryCommand');
+const HelpCommand = require('./commands/helpCommand'); // นำเข้าคำสั่ง !help
 
-// Webhook utility function
+// ฟังก์ชันส่งข้อมูลไปยัง Webhook
 const sendToDiscordWebhook = async (title, message, color = '#FF0000') => {
   try {
     const embed = new EmbedBuilder()
@@ -24,72 +25,76 @@ const sendToDiscordWebhook = async (title, message, color = '#FF0000') => {
   }
 };
 
-// Initialize Discord bot client
+// การตั้งค่าบอท Discord
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
-// Handle bot startup
+// การเริ่มต้นบอท
 client.once('ready', async () => {
-  console.log(chalk.green('✅ Bot is online and ready to go!'));
-  await sendToDiscordWebhook('✅ Bot Online', '```The bot is running and ready!```', '#00FF00');
+  console.log(chalk.green('✅ บอทออนไลน์และพร้อมใช้งาน!'));
+  await sendToDiscordWebhook('✅ Bot Online', '```บอทกำลังทำงานและพร้อมใช้งาน!```', '#00FF00');
 });
 
-// Handle incoming messages
+// การจัดการข้อความที่เข้ามา
 client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
+  if (message.author.bot || !message.content.trim()) return; // ข้ามข้อความที่ว่างหรือมาจากบอท
 
   const args = message.content.trim().split(/\s+/);
   const commandName = args.shift().toLowerCase();
 
-  // Command: !zombie
-  if (commandName === '!zombie') {
-    try {
-      await ZombieCommand.execute(message);
-    } catch (error) {
-      console.error(chalk.red(`❌ Error executing !zombie: ${error.message}`));
-      message.reply('An error occurred while executing the command.');
-      await sendToDiscordWebhook('❌ Error executing !zombie', error.message);
-    }
-  }
+  try {
+    switch (commandName) {
+      case '!zombie':
+        await ZombieCommand.execute(message);
+        break;
 
-  // Command: !inventory
-  if (commandName === '!inventory') {
-    try {
-      await InventoryCommand.showInventory(message); // Call showInventory from InventoryCommand
-    } catch (error) {
-      console.error(chalk.red(`❌ Error executing !inventory: ${error.message}`));
-      message.reply('An error occurred while executing the command.');
-      await sendToDiscordWebhook('❌ Error executing !inventory', error.message);
+      case '!inventory':
+        await InventoryCommand.showInventory(message);
+        break;
+
+      case '!help': // เพิ่มคำสั่ง !help ที่นี่
+        await HelpCommand.execute(message); // เรียกใช้คำสั่ง !help
+        break;
+
+      default:
+        console.log(`คำสั่งที่ไม่รู้จัก: ${commandName}`);
+        break;
     }
+  } catch (error) {
+    console.error(chalk.red(`❌ เกิดข้อผิดพลาดในการใช้คำสั่ง ${commandName}: ${error.message}`));
+    message.reply(`เกิดข้อผิดพลาดในการใช้คำสั่ง ${commandName}`);
+    await sendToDiscordWebhook(`❌ เกิดข้อผิดพลาดในการใช้คำสั่ง ${commandName}`, error.message);
   }
 });
 
-// Handle bot disconnection
+// การจัดการการตัดการเชื่อมต่อของบอท
 client.on('shardDisconnect', async (event, id) => {
-  console.warn(chalk.yellow(`⚠️ Disconnected (Shard ID: ${id})`));
-  await sendToDiscordWebhook('⚠️ Bot Offline', `The bot disconnected (Shard ID: ${id})`, '#FFA500');
+  console.warn(chalk.yellow(`⚠️ บอทตัดการเชื่อมต่อ (Shard ID: ${id})`));
+  await sendToDiscordWebhook('⚠️ Bot Offline', `บอทตัดการเชื่อมต่อ (Shard ID: ${id})`, '#FFA500');
 });
 
-// Handle bot shutdown
+// การจัดการการปิดบอท
 const shutdownHandler = async (reason) => {
-  console.warn(chalk.yellow(`⚠️ Shutting down: ${reason}`));
+  console.warn(chalk.yellow(`⚠️ กำลังปิดบอท: ${reason}`));
   
-  await Promise.allSettled([ 
-    sendToDiscordWebhook('⚠️ Bot Offline', `Shutting down: ${reason}`, '#FFA500')
-  ]);
-
-  process.exit(0);
+  const promises = [
+    sendToDiscordWebhook('⚠️ Bot Offline', `กำลังปิดบอท: ${reason}`, '#FFA500')
+  ];
+  
+  await Promise.all(promises);
+  process.exit(0); // ปิดโปรเซสหลังจากดำเนินการทั้งหมดเสร็จ
 };
 
-// Listen for shutdown signals
+// ฟังเหตุการณ์การปิดบอท
 ['beforeExit', 'SIGINT', 'SIGTERM'].forEach(event =>
-  process.on(event, () => shutdownHandler(`Received ${event}`))
+  process.on(event, () => shutdownHandler(`ได้รับสัญญาณ ${event}`))
 );
 
-// Bot login
-client.login(process.env.DISCORD_TOKEN).catch(async (error) => {
-  console.error(chalk.red(`❌ Login Error: ${error.message}`));
-  await sendToDiscordWebhook('❌ Error logging in', error.message);
-  process.exit(1);
-});
+// การเข้าสู่ระบบของบอท
+client.login(process.env.DISCORD_TOKEN)
+  .catch(async (error) => {
+    console.error(chalk.red(`❌ ข้อผิดพลาดในการเข้าสู่ระบบ: ${error.message}`));
+    await sendToDiscordWebhook('❌ ข้อผิดพลาดในการเข้าสู่ระบบ', error.message);
+    process.exit(1); // ออกจากโปรเซสหากเข้าสู่ระบบไม่ได้
+  });

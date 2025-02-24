@@ -1,206 +1,170 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { addItemToInventory } = require('./inventoryCommand'); // นำเข้าไฟล์ inventory.js
+const { addItemToInventory } = require('./inventoryCommand');
+const axios = require('axios');
 
-// ฟังก์ชันสุ่มไอเทม
-function getRandomItem(user) {
-  const items = [
-    { name: 'ยาเพิ่มพลังชีวิต', description: 'เพิ่มพลังชีวิต 20 HP', effect: (userHp) => userHp + 20 },
-    { name: 'ดาบเหล็ก', description: 'เพิ่มพลังโจมตี 5-15%', effect: (userAttack) => userAttack * 1.1 },
-    { name: 'เกราะเหล็ก', description: 'เพิ่มพลังป้องกัน 10%', effect: (zombieHp) => zombieHp * 0.9 },
-    { name: 'คาถาฟ้าผ่า', description: 'โจมตีทุกฝ่ายให้เสียหาย 10 HP', effect: (userHp, zombieHp) => {
-      userHp = Math.max(userHp - 10, 0);
-      zombieHp = Math.max(zombieHp - 10, 0);
-      return { userHp, zombieHp };
-    }}
-  ];
+const BASE_HP = 100;
+const BASE_ATTACK = { min: 5, max: 15 };
+const BASE_SPEED = 10;
 
-  const item = items[Math.floor(Math.random() * items.length)];
-  addItemToInventory(user.id, item); // เพิ่มไอเทมลงในอินเวนทอรี
-  return item;
+function generateCustomId(prefix, zombieName) {
+  // Creating a unique Custom ID using the prefix and zombieName along with timestamp
+  return `${prefix}_${zombieName}_${Date.now()}`;
 }
 
-// ฟังก์ชันสร้าง Embed สำหรับการต่อสู้
-function createBattleEmbed(user, zombie, userHp, zombieHp, description) {
+function createBattleEmbed(user, zombie, userHp, zombieHp, userSpeed, zombieSpeed, description) {
   return new EmbedBuilder()
-    .setTitle(`💥 การต่อสู้: ${user} vs ${zombie.name} 💥`)
+    .setTitle(`⚔️ ${user} vs ${zombie.name} 🧟`)
     .setDescription(description)
-    .setColor(userHp > 0 ? '#28a745' : '#dc3545')
-    .setThumbnail(zombie.thumbnail || 'https://example.com/default-image.png')
+    .setColor(userHp > 0 ? '#2ECC71' : '#E74C3C')
+    .setThumbnail(zombie.thumbnail || 'https://example.com/default-thumbnail.jpg') // Default thumbnail if not available
     .addFields(
-      { name: `${user} HP`, value: `**${userHp}**`, inline: true },
-      { name: `${zombie.name} HP`, value: `**${zombieHp}**`, inline: true }
+      { name: `❤️ ${user} HP`, value: `**${userHp}**`, inline: true },
+      { name: `🧟‍♂️ ${zombie.name} HP`, value: `**${zombieHp}**`, inline: true },
+      { name: `⚡ ความเร็ว`, value: `**${userSpeed} vs ${zombieSpeed}**`, inline: false }
     );
 }
 
-// ฟังก์ชันคำนวณความเสียหาย
 function calculateDamage(base, min, max) {
-  return Math.floor(Math.random() * (max - min + 1) + min) + Math.floor(base / 10);
+  const damage = Math.floor(Math.random() * (max - min + 1) + min) + Math.floor(base / 10);
+  return Math.max(damage, 0); // Ensure that damage is not negative
 }
 
-// ฟังก์ชันดึงรายชื่อซอมบี้
 function getZombieList() {
   return [
-    { name: 'Zombie ธรรมดา', hp: 60, thumbnail: 'https://cdn.discordapp.com/attachments/1336344482005909575/1343106648046174293/eef0fd22941ee5b567796a0c244bdcb9.jpg' },
-    { name: 'Zombie กลายพันธุ์', hp: 100, thumbnail: 'https://cdn.discordapp.com/attachments/1336344482005909575/1343107220262354964/64e72d558ced56bd1ab16bfbf808871a.jpg' },
-    { name: 'Zombie ลึกลับ', hp: 80, thumbnail: 'https://cdn.discordapp.com/attachments/1336344482005909575/1343107425695301642/66ffc9cdf73935e7dae8e1e0f3b86480.jpg' },
+    { name: '🧟 Zombie ธรรมดา', hp: 60, attack: 8, speed: 8, thumbnail: 'https://example.com/zombie1.jpg' },
+    { name: '🧟‍♂️ Zombie กลายพันธุ์', hp: 100, attack: 12, speed: 6, thumbnail: 'https://example.com/zombie2.jpg' },
+    { name: '🧛 Zombie ลึกลับ', hp: 80, attack: 10, speed: 12, thumbnail: 'https://example.com/zombie3.jpg' },
   ];
 }
 
-// ฟังก์ชันสุ่มซอมบี้
 function getRandomZombie() {
-  const zombies = getZombieList();
-  const isBossBattle = Math.random() < 0.1;
-  return isBossBattle ? getBossZombie() : zombies[Math.floor(Math.random() * zombies.length)];
+  return getZombieList()[Math.floor(Math.random() * getZombieList().length)];
 }
 
-// ฟังก์ชันเลือกซอมบี้จากปุ่ม
-function getSelectedZombie(customId) {
-  if (customId === 'random') return getRandomZombie();
-  if (customId === 'boss') return getBossZombie();
-  return getZombieByName(customId);
+async function sendToWebhook(title, message, color = '#FF0000') {
+  try {
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setDescription(message)
+      .setColor(color)
+      .setTimestamp();
+
+    await axios.post(process.env.DISCORD_WEBHOOK_URL, { embeds: [embed] }, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error(`❌ Webhook Error: ${error.message}`);
+    console.error(`Webhook URL: ${process.env.DISCORD_WEBHOOK_URL}`);
+  }
 }
 
-// ฟังก์ชันตรวจสอบชื่อซอมบี้
-function getZombieByName(name) {
-  return getZombieList().find((zombie) => zombie.name === name);
-}
-
-// ฟังก์ชัน Boss Zombie
-function getBossZombie() {
-  return {
-    name: 'Boss Zombie',
-    hp: 150,
-    thumbnail: 'https://cdn.discordapp.com/attachments/1336344482005909575/1343107425695301642/66ffc9cdf73935e7dae8e1e0f3b86480.jpg',
-    specialAbility: 'พลังแห่งความมืด! ทำให้ผู้เล่นได้รับความเสียหายสูงขึ้นในทุกๆ เทิร์น',
-  };
-}
-
-// ฟังก์ชันสร้าง Embed เริ่มต้น
-function createEmbed() {
-  return new EmbedBuilder()
-    .setTitle('🧟‍♂️ เลือก Zombie ที่คุณต้องการต่อสู้!')
-    .setDescription('กดปุ่มเพื่อเลือก Zombie หรือสุ่ม!')
-    .setColor('#FFA500');
-}
-
-// ฟังก์ชันสร้างปุ่มสำหรับเลือกซอมบี้
-function createButtonRows() {
-  const firstRow = new ActionRowBuilder().addComponents(
-    ...getZombieList().slice(0, 3).map((zombie) =>
-      new ButtonBuilder()
-        .setCustomId(zombie.name)
-        .setLabel(zombie.name)
-        .setStyle(ButtonStyle.Primary)
-    ),
-    new ButtonBuilder().setCustomId('random').setLabel('🔄 สุ่ม').setStyle(ButtonStyle.Success)
-  );
-
-  const secondRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('boss').setLabel('💀 Boss Zombie').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('cancel').setLabel('❌ ยกเลิก').setStyle(ButtonStyle.Danger)
-  );
-
-  return [firstRow, secondRow];
-}
-
-// ฟังก์ชันเริ่มการต่อสู้
 async function startBattle(message, user, zombie) {
-  let userHp = 100;
+  let userHp = BASE_HP;
   let zombieHp = zombie.hp;
-  let turnCounter = 0;
+  let userSpeed = BASE_SPEED;
+  let zombieSpeed = zombie.speed;
 
   const battleMessage = await message.channel.send({
-    embeds: [createBattleEmbed(user.username, zombie, userHp, zombieHp, '⚔️ การต่อสู้เริ่มต้นขึ้น! ⚔️')],
+    embeds: [createBattleEmbed(user.username, zombie, userHp, zombieHp, userSpeed, zombieSpeed, '⚔️ เริ่มต่อสู้!')]
   });
 
   while (userHp > 0 && zombieHp > 0) {
-    turnCounter++;
-    const userAttack = calculateDamage(userHp, 5, 20);
-    const zombieAttack = calculateDamage(turnCounter, 5, 20);
+    const isUserFaster = userSpeed >= zombieSpeed;
 
-    userHp = Math.max(userHp - zombieAttack, 0);
-    zombieHp = Math.max(zombieHp - userAttack, 0);
-
-    let battleText = `${user.username} โจมตี ${zombie.name} ⚔️ (-${userAttack} HP)\n${zombie.name} ตอบโต้! 🧟‍♂️ (-${zombieAttack} HP)`;
-
-    // เพิ่มอีเวนต์พิเศษต่างๆ ในการต่อสู้
-    if (Math.random() < 0.15) {
-      battleText += `\n⚡ ฟ้าผ่า! ทั้ง ${user.username} และ ${zombie.name} ถูกโจมตี! ⚡`;
-      userHp = Math.max(userHp - 10, 0);
-      zombieHp = Math.max(zombieHp - 10, 0);
+    // Handle user attack
+    if (isUserFaster) {
+      const userAttack = calculateDamage(userHp, BASE_ATTACK.min, BASE_ATTACK.max);
+      zombieHp = Math.max(zombieHp - userAttack, 0);
     }
 
-    if (Math.random() < 0.1) {
-      battleText += `\n🔥 ${user.username} ได้รับบัฟพิเศษ! เพิ่มพลังโจมตี! 🔥`;
+    // Handle zombie attack if still alive
+    if (zombieHp > 0) {
+      const zombieAttack = calculateDamage(zombieHp, zombie.attack - 3, zombie.attack);
+      userHp = Math.max(userHp - zombieAttack, 0);
     }
 
-    if (Math.random() < 0.1) {
-      battleText += `\n🛡️ ${zombie.name} ได้รับเกราะเพิ่มพลังป้องกัน! 🛡️`;
-      zombieHp = Math.min(zombieHp + 10, zombie.hp);
-    }
-
-    if (zombie.name === 'Boss Zombie') {
-      battleText += `\n💀 ${zombie.name} ใช้ความสามารถพิเศษ: ${zombie.specialAbility}! 💀`;
-      userHp = Math.max(userHp - 15, 0);
-    }
-
+    // Update the battle embed message
     await battleMessage.edit({
-      embeds: [createBattleEmbed(user.username, zombie, userHp, zombieHp, battleText)],
+      embeds: [
+        createBattleEmbed(
+          user.username, zombie, userHp, zombieHp, userSpeed, zombieSpeed,
+          `🗡️ ${user.username} โจมตี! (-${userHp} HP)\n🧟 ${zombie.name} ตอบโต้! (-${zombieHp} HP)`
+        ),
+      ],
     });
-
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // เว้นเวลา 2 วินาที
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
   let battleEndText = userHp > 0
-    ? `🎉 ${user.username} ชนะการต่อสู้! 🎉`
-    : `💀 ${user.username} พ่ายแพ้ให้กับ ${zombie.name}... 💀`;
+    ? `🎉 ${user.username} ชนะ! ได้รับรางวัล!`
+    : `💀 ${user.username} ถูกกำจัดโดย ${zombie.name}...`;
 
-  // สุ่มไอเทมหลังจากชนะ
+  // Reward if user wins
   if (userHp > 0) {
-    const item = getRandomItem(user);  // ส่ง user ไปยังฟังก์ชัน getRandomItem
-    battleEndText += `\n🏆 ${user.username} ได้รับไอเทม: **${item.name}** - ${item.description}`;
+    const reward = {
+      id: 'healing_potion',
+      name: 'ยาเพิ่มพลัง',
+      description: 'ฟื้นฟูพลังชีวิต 20 HP',
+      type: 'consumable',
+      rarity: 'common',
+      value: 20
+    };
+
+    // Ensure reward is valid
+    if (reward && reward.id && reward.name && reward.value) {
+      addItemToInventory(user.id, reward);
+      battleEndText += `\n🏆 **ได้รับไอเทม:** ${reward.name} - ฟื้นฟูพลังชีวิต ${reward.value} HP`;
+    } else {
+      console.error('❌ Invalid reward item:', reward);
+    }
   }
 
   await battleMessage.edit({
-    embeds: [createBattleEmbed(user.username, zombie, userHp, zombieHp, battleEndText)],
+    embeds: [createBattleEmbed(user.username, zombie, userHp, zombieHp, userSpeed, zombieSpeed, battleEndText)],
   });
 }
 
-// คำสั่งหลักสำหรับการเลือกและการต่อสู้
 module.exports = {
   data: {
     name: '!zombie',
-    description: 'คำสั่งที่เกี่ยวกับซอมบี้'
+    description: 'เลือกซอมบี้เพื่อต่อสู้'
   },
 
   async execute(message) {
     const user = message.author;
+    const embed = new EmbedBuilder().setTitle('🧟 เลือก Zombie ที่ต้องการต่อสู้!').setColor('#FFA500');
+    const zombies = getZombieList();
 
-    // สร้าง Embed เริ่มต้น
-    const embed = createEmbed();
+    const buttons = zombies.map((zombie) =>
+      new ButtonBuilder().setCustomId(generateCustomId('zombie', zombie.name)).setLabel(zombie.name).setStyle(ButtonStyle.Primary)
+    );
+    buttons.push(
+      new ButtonBuilder().setCustomId('random').setLabel('🔄 สุ่ม').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('cancel').setLabel('❌ ยกเลิก').setStyle(ButtonStyle.Danger)
+    );
 
-    // สร้างปุ่มเลือกซอมบี้
-    const [firstRow, secondRow] = createButtonRows();
+    const actionRow = new ActionRowBuilder().addComponents(buttons);
+    const selectionMessage = await message.channel.send({ embeds: [embed], components: [actionRow] });
 
-    // ส่งข้อความที่มีปุ่ม
-    const selectionMessage = await message.channel.send({
-      embeds: [embed],
-      components: [firstRow, secondRow],
-    });
-
-    // ฟิลเตอร์และคอลเลกเตอร์สำหรับการคลิกปุ่ม
     const filter = (i) => i.user.id === user.id;
     const collector = selectionMessage.createMessageComponentCollector({ filter, time: 15000 });
 
     collector.on('collect', async (i) => {
       await i.deferUpdate();
+      if (i.customId === 'cancel') return collector.stop('cancelled');
 
-      if (i.customId === 'cancel') {
-        return collector.stop('cancelled');
+      let selectedZombie;
+      if (i.customId === 'random') {
+        selectedZombie = getRandomZombie();
+      } else {
+        selectedZombie = zombies.find((zombie) => generateCustomId('zombie', zombie.name) === i.customId); // Compare custom ID
       }
 
-      const selectedZombie = getSelectedZombie(i.customId);
-      if (!selectedZombie) return;
+      if (!selectedZombie) {
+        console.error('Error: Selected zombie is undefined.');
+        await sendToWebhook('⚠️ Error in Battle', `Selected zombie is undefined. Custom ID: ${i.customId}`, '#FF0000');
+        return;
+      }
 
       collector.stop();
       await startBattle(message, user, selectedZombie);
@@ -208,10 +172,7 @@ module.exports = {
 
     collector.on('end', (collected, reason) => {
       if (reason === 'cancelled') {
-        selectionMessage.edit({
-          embeds: [embed.setDescription('คุณได้ยกเลิกการเลือก!')],
-          components: [],
-        });
+        selectionMessage.edit({ embeds: [embed.setDescription('🚫 คุณยกเลิกการเลือก!')], components: [] });
       } else {
         selectionMessage.edit({ components: [] });
       }
